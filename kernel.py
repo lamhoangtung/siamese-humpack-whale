@@ -752,9 +752,9 @@ steps = 0
 
 tmp = keras.models.load_model('standard5.model')
 model.set_weights(tmp.get_weights())
-weights = model.get_weights()
-model, branch_model, head_model = build_model(64e-5, 0.0002)
-model.set_weights(weights)
+# weights = model.get_weights()
+# model, branch_model, head_model = build_model(64e-5, 0.0002)
+# model.set_weights(weights)
 for _ in range(10): make_steps(5, 1.0)
 model.save('standard6.model')
 # epoch -> 350
