@@ -1,74 +1,38 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# ## Updated TL;DR
-# 
-# I am just using the pretrained weights from  [@martinpiotte](https://kaggle.com/martinpiotte). Thanks to **@suicaokhoailang** for creating the updated kernel. I think the important steps to improve to 0.9 are:
-# - Get rid of `lapjv` dependency. It really slows down training/trying different ideas.
-# - Load images as RGB (and retrain). I can't find where, but the current first place wrote that it helps by ~0.1.
-# 
-# ### Interesting:
-# - The `mpiotte-bootstrap-model` only scored `0.697`. Though, it was better on the playgroud competition.
-# 
-# ## TL;DR
-# 
-# I tried to refactor [@martinpiotte](https://kaggle.com/martinpiotte)'s original kernel [here](https://www.kaggle.com/martinpiotte/whale-recognition-model-with-score-0-78563).
-# 
-# I changed almost nothing beside commenting out the latter 380 epochs since it can't fit into a kernel. I also generated the new bounding boxes in my kernel [here](https://www.kaggle.com/suicaokhoailang/generating-whale-bounding-boxes) and saved it as a **.csv** instead of **pickle** for readability. 
-# 
-# A few things to point out:
-# 
-# - Training more will probably improve your score, maybe as many as 500 epochs. We only train for 20 epochs in this kernel.
-# 
-# - You may try to improve your training time by applying this technique (thanks **Brian**): https://www.kaggle.com/c/humpback-whale-identification/discussion/74402#444476 .
-# 
-# - Consider using a pretrained model(s), good for blending.
-
-# In[6]:
-
-
-# !pip3 install lap --user
-# Read the dataset description
-import gzip
-# Read or generate p2h, a dictionary of image name to image id (picture to hash)
 import pickle
 import platform
 import random
-# Suppress annoying stderr output when importing keras.
 import sys
-from lap import lapjv
+import time
 from math import sqrt
-# Determine the size of each image
 from os.path import isfile
 
+import cv2
 import keras
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from PIL import Image as pil_image
 from imagehash import phash
 from keras import backend as K
 from keras import regularizers
 from keras.engine.topology import Input
-from keras.layers import Activation, Add, BatchNormalization, Concatenate, Conv2D, Dense, Flatten, GlobalMaxPooling2D,     Lambda, MaxPooling2D, Reshape
+from keras.layers import (Activation, Add, BatchNormalization, Concatenate,
+                          Conv2D, Dense, Flatten, GlobalMaxPooling2D, Lambda,
+                          MaxPooling2D, Reshape)
 from keras.models import Model
 from keras.optimizers import Adam
 from keras.preprocessing.image import img_to_array
 from keras.utils import Sequence
+from lap import lapjv
 from pandas import read_csv
-from scipy.ndimage import affine_transform
-# from tqdm import tqdm_notebook as tqdm
+from PIL import Image as pil_image
 from tqdm import tqdm
-import time
 
+from imgaug import augmenters as iaa
 
-# In[7]:
-
-
-TRAIN_DF = './data/train.csv'
+TRAIN_DF = './metadata/oversampled_train_and_val.csv'
 SUB_Df = './sample_submission.csv'
-TRAIN = './data/train/'
-TEST = './data/test/'
+TRAIN = './train/'
+TEST = './test/'
 P2H = './metadata/p2h.pickle'
 P2SIZE = './metadata/p2size.pickle'
 BB_DF = "./metadata/bounding_boxes.csv"
@@ -77,22 +41,12 @@ submit = [p for _, p, _ in read_csv(SUB_Df).to_records()]
 join = list(tagged.keys()) + submit
 
 
-# In[8]:
-
-
 def expand_path(p):
     if isfile(TRAIN + p):
         return TRAIN + p
     if isfile(TEST + p):
         return TEST + p
     return p
-
-
-# ## Duplicate image identification
-# 
-# This part was from the original kernel, seems like in the playground competition dulicated images was a real issue. I don't know the case about this one but I took one for the team and generated the results anyway. I'm such a nice chap.
-
-# In[9]:
 
 
 if isfile(P2SIZE):
@@ -106,15 +60,13 @@ else:
         p2size[p] = size
 
 
-# In[10]:
-
-
 def match(h1, h2):
     for p1 in h2ps[h1]:
         for p2 in h2ps[h2]:
             i1 = pil_image.open(expand_path(p1))
             i2 = pil_image.open(expand_path(p2))
-            if i1.mode != i2.mode or i1.size != i2.size: return False
+            if i1.mode != i2.mode or i1.size != i2.size:
+                return False
             a1 = np.array(i1)
             a1 = a1 - a1.mean()
             a1 = a1 / sqrt((a1 ** 2).mean())
@@ -122,7 +74,8 @@ def match(h1, h2):
             a2 = a2 - a2.mean()
             a2 = a2 / sqrt((a2 ** 2).mean())
             a = ((a1 - a2) ** 2).mean()
-            if a > 0.1: return False
+            if a > 0.1:
+                return False
     return True
 
 
@@ -141,8 +94,10 @@ else:
     # Find all images associated with a given phash value.
     h2ps = {}
     for p, h in p2h.items():
-        if h not in h2ps: h2ps[h] = []
-        if p not in h2ps[h]: h2ps[h].append(p)
+        if h not in h2ps:
+            h2ps[h] = []
+        if p not in h2ps[h]:
+            h2ps[h].append(p)
 
     # Find all distinct phash values
     hs = list(h2ps.keys())
@@ -154,46 +109,49 @@ else:
             if h1 - h2 <= 6 and match(h1, h2):
                 s1 = str(h1)
                 s2 = str(h2)
-                if s1 < s2: s1, s2 = s2, s1
+                if s1 < s2:
+                    s1, s2 = s2, s1
                 h2h[s1] = s2
 
     # Group together images with equivalent phash, and replace by string format of phash (faster and more readable)
     for p, h in p2h.items():
         h = str(h)
-        if h in h2h: h = h2h[h]
+        if h in h2h:
+            h = h2h[h]
         p2h[p] = h
 #     with open(P2H, 'wb') as f:
 #         pickle.dump(p2h, f)
 # For each image id, determine the list of pictures
 h2ps = {}
 for p, h in p2h.items():
-    if h not in h2ps: h2ps[h] = []
-    if p not in h2ps[h]: h2ps[h].append(p)
-
-
-# In[11]:
+    if h not in h2ps:
+        h2ps[h] = []
+    if p not in h2ps[h]:
+        h2ps[h].append(p)
 
 
 def show_whale(imgs, per_row=2):
     n = len(imgs)
     rows = (n + per_row - 1) // per_row
     cols = min(per_row, n)
-    fig, axes = plt.subplots(rows, cols, figsize=(24 // per_row * cols, 24 // per_row * rows))
-    for ax in axes.flatten(): ax.axis('off')
-    for i, (img, ax) in enumerate(zip(imgs, axes.flatten())): ax.imshow(img.convert('RGB'))
-        
+    fig, axes = plt.subplots(rows, cols, figsize=(
+        24 // per_row * cols, 24 // per_row * rows))
+    for ax in axes.flatten():
+        ax.axis('off')
+    for i, (img, ax) in enumerate(zip(imgs, axes.flatten())):
+        ax.imshow(img.convert('RGB'))
+
 
 def read_raw_image(p):
-    img = pil_image.open(expand_path(p))
+    # img = pil_image.open(expand_path(p))
+    img = cv2.imread(expand_path(p))
     return img
-
-
-# In[12]:
 
 
 # For each images id, select the prefered image
 def prefer(ps):
-    if len(ps) == 1: return ps[0]
+    if len(ps) == 1:
+        return ps[0]
     best_p = ps[0]
     best_s = p2size[best_p]
     for i in range(1, len(ps)):
@@ -204,29 +162,27 @@ def prefer(ps):
             best_s = s
     return best_p
 
+
 h2p = {}
 for h, ps in h2ps.items():
     h2p[h] = prefer(ps)
 len(h2p), list(h2p.items())[:5]
 
 
-# In[13]:
-
 
 # Read the bounding box data from the bounding box kernel (see reference above)
 p2bb = pd.read_csv(BB_DF).set_index("Image")
 
 old_stderr = sys.stderr
-sys.stderr = open('/dev/null' if platform.system() != 'Windows' else 'nul', 'w')
+sys.stderr = open('/dev/null' if platform.system()
+                  != 'Windows' else 'nul', 'w')
 
 sys.stderr = old_stderr
 
-img_shape = (384, 384, 1)  # The image shape used by the model
+img_shape = (384, 384, 3)  # The image shape used by the model
 anisotropy = 2.15  # The horizontal compression ratio
-crop_margin = 0.05  # The margin added around the bounding box to compensate for bounding box inaccuracy
-
-
-# In[14]:
+# The margin added around the bounding box to compensate for bounding box inaccuracy
+crop_margin = 0.05
 
 
 def build_transform(rotation, shear, height_zoom, width_zoom, height_shift, width_shift):
@@ -237,14 +193,15 @@ def build_transform(rotation, shear, height_zoom, width_zoom, height_shift, widt
     shear = np.deg2rad(shear)
     rotation_matrix = np.array(
         [[np.cos(rotation), np.sin(rotation), 0], [-np.sin(rotation), np.cos(rotation), 0], [0, 0, 1]])
-    shift_matrix = np.array([[1, 0, height_shift], [0, 1, width_shift], [0, 0, 1]])
-    shear_matrix = np.array([[1, np.sin(shear), 0], [0, np.cos(shear), 0], [0, 0, 1]])
-    zoom_matrix = np.array([[1.0 / height_zoom, 0, 0], [0, 1.0 / width_zoom, 0], [0, 0, 1]])
-    shift_matrix = np.array([[1, 0, -height_shift], [0, 1, -width_shift], [0, 0, 1]])
+    shift_matrix = np.array(
+        [[1, 0, height_shift], [0, 1, width_shift], [0, 0, 1]])
+    shear_matrix = np.array(
+        [[1, np.sin(shear), 0], [0, np.cos(shear), 0], [0, 0, 1]])
+    zoom_matrix = np.array(
+        [[1.0 / height_zoom, 0, 0], [0, 1.0 / width_zoom, 0], [0, 0, 1]])
+    shift_matrix = np.array(
+        [[1, 0, -height_shift], [0, 1, -width_shift], [0, 0, 1]])
     return np.dot(np.dot(rotation_matrix, shear_matrix), np.dot(zoom_matrix, shift_matrix))
-
-
-# In[15]:
 
 
 def read_cropped_image(p, augment):
@@ -261,61 +218,22 @@ def read_cropped_image(p, augment):
     # Determine the region of the original image we want to capture based on the bounding box.
     row = p2bb.loc[p]
     x0, y0, x1, y1 = row['x0'], row['y0'], row['x1'], row['y1']
-    dx = x1 - x0
-    dy = y1 - y0
-    x0 -= dx * crop_margin
-    x1 += dx * crop_margin + 1
-    y0 -= dy * crop_margin
-    y1 += dy * crop_margin + 1
-    if x0 < 0:
-        x0 = 0
-    if x1 > size_x:
-        x1 = size_x
-    if y0 < 0:
-        y0 = 0
-    if y1 > size_y:
-        y1 = size_y
-    dx = x1 - x0
-    dy = y1 - y0
-    if dx > dy * anisotropy:
-        dy = 0.5 * (dx / anisotropy - dy)
-        y0 -= dy
-        y1 += dy
-    else:
-        dx = 0.5 * (dy * anisotropy - dx)
-        x0 -= dx
-        x1 += dx
-
-    # Generate the transformation matrix
-    trans = np.array([[1, 0, -0.5 * img_shape[0]], [0, 1, -0.5 * img_shape[1]], [0, 0, 1]])
-    trans = np.dot(np.array([[(y1 - y0) / img_shape[0], 0, 0], [0, (x1 - x0) / img_shape[1], 0], [0, 0, 1]]), trans)
+    img = read_raw_image(p)
+    img = img[y0:y1, x0:x1]
+    img = cv2.resize(img, img_shape[:-1])
+    # Affine transform
     if augment:
-        trans = np.dot(build_transform(
-            random.uniform(-5, 5),
-            random.uniform(-5, 5),
-            random.uniform(0.8, 1.0),
-            random.uniform(0.8, 1.0),
-            random.uniform(-0.05 * (y1 - y0), 0.05 * (y1 - y0)),
-            random.uniform(-0.05 * (x1 - x0), 0.05 * (x1 - x0))
-        ), trans)
-    trans = np.dot(np.array([[1, 0, 0.5 * (y1 + y0)], [0, 1, 0.5 * (x1 + x0)], [0, 0, 1]]), trans)
+        augmentor = iaa.Affine(
+            scale=(1.0, 1.2),
+            shear=(-30, 30),
+            order=1,
+            mode='constant',
+            cval=np.average(img)
+        )
+        img = augmentor.augment_image(img)
 
-    # Read the image, transform to black and white and comvert to numpy array
-    img = read_raw_image(p).convert('L')
-    img = img_to_array(img)
-
-    # Apply affine transformation
-    matrix = trans[:2, :2]
-    offset = trans[:2, 2]
-    img = img.reshape(img.shape[:-1])
-    img = affine_transform(img, matrix, offset, output_shape=img_shape[:-1], order=1, mode='constant',
-                           cval=np.average(img))
-    img = img.reshape(img_shape)
-
-    # Normalize to zero mean and unit variance
-    img -= np.mean(img, keepdims=True)
-    img /= np.std(img, keepdims=True) + K.epsilon()
     return img
+
 
 def read_for_training(p):
     """
@@ -334,17 +252,17 @@ def read_for_validation(p):
 p = list(tagged.keys())[312]
 
 
-# In[16]:
-
-
 def subblock(x, filter, **kwargs):
     x = BatchNormalization()(x)
     y = x
-    y = Conv2D(filter, (1, 1), activation='relu', **kwargs)(y)  # Reduce the number of features to 'filter'
+    # Reduce the number of features to 'filter'
+    y = Conv2D(filter, (1, 1), activation='relu', **kwargs)(y)
     y = BatchNormalization()(y)
-    y = Conv2D(filter, (3, 3), activation='relu', **kwargs)(y)  # Extend the feature field
+    y = Conv2D(filter, (3, 3), activation='relu', **
+               kwargs)(y)  # Extend the feature field
     y = BatchNormalization()(y)
-    y = Conv2D(K.int_shape(x)[-1], (1, 1), **kwargs)(y)  # no activation # Restore the number of original features
+    # no activation # Restore the number of original features
+    y = Conv2D(K.int_shape(x)[-1], (1, 1), **kwargs)(y)
     y = Add()([x, y])  # Add the bypass connection
     y = Activation('relu')(y)
     return y
@@ -413,7 +331,8 @@ def build_model(lr, l2, activation='sigmoid'):
     x = Flatten(name='flatten')(x)
 
     # Weighted sum implemented as a Dense layer.
-    x = Dense(1, use_bias=True, activation=activation, name='weighted-average')(x)
+    x = Dense(1, use_bias=True, activation=activation,
+              name='weighted-average')(x)
     head_model = Model([xa_inp, xb_inp], x, name='head')
 
     ########################
@@ -427,14 +346,12 @@ def build_model(lr, l2, activation='sigmoid'):
     xb = branch_model(img_b)
     x = head_model([xa, xb])
     model = Model([img_a, img_b], x)
-    model.compile(optim, loss='binary_crossentropy', metrics=['binary_crossentropy', 'acc'])
+    model.compile(optim, loss='binary_crossentropy',
+                  metrics=['binary_crossentropy', 'acc'])
     return model, branch_model, head_model
 
 
 model, branch_model, head_model = build_model(64e-5, 0)
-
-
-# In[17]:
 
 
 h2ws = {}
@@ -442,8 +359,10 @@ new_whale = 'new_whale'
 for p, w in tagged.items():
     if w != new_whale:  # Use only identified whales
         h = p2h[p]
-        if h not in h2ws: h2ws[h] = []
-        if w not in h2ws[h]: h2ws[h].append(w)
+        if h not in h2ws:
+            h2ws[h] = []
+        if w not in h2ws[h]:
+            h2ws[h].append(w)
 for h, ws in h2ws.items():
     if len(ws) > 1:
         h2ws[h] = sorted(ws)
@@ -453,14 +372,14 @@ w2hs = {}
 for h, ws in h2ws.items():
     if len(ws) == 1:  # Use only unambiguous pictures
         w = ws[0]
-        if w not in w2hs: w2hs[w] = []
-        if h not in w2hs[w]: w2hs[w].append(h)
+        if w not in w2hs:
+            w2hs[w] = []
+        if h not in w2hs[w]:
+            w2hs[w].append(h)
 for w, hs in w2hs.items():
     if len(hs) > 1:
         w2hs[w] = sorted(hs)
 
-
-# In[18]:
 
 
 train = []  # A list of training image ids
@@ -486,9 +405,6 @@ for i, t in enumerate(train):
     t2i[t] = i
 
 
-# In[19]:
-
-
 class TrainingData(Sequence):
     def __init__(self, score, steps=1000, batch_size=32):
         """
@@ -496,7 +412,8 @@ class TrainingData(Sequence):
         @param steps the number of epoch we are planning with this score matrix
         """
         super(TrainingData, self).__init__()
-        self.score = -score  # Maximizing the score is the same as minimuzing -score.
+        # Maximizing the score is the same as minimuzing -score.
+        self.score = -score
         self.steps = steps
         self.batch_size = batch_size
         for ts in w2ts.values():
@@ -527,7 +444,8 @@ class TrainingData(Sequence):
         return [a, b], c
 
     def on_epoch_end(self):
-        if self.steps <= 0: return  # Skip this on the last epoch.
+        if self.steps <= 0:
+            return  # Skip this on the last epoch.
         self.steps -= 1
         self.match = []
         self.unmatch = []
@@ -539,8 +457,10 @@ class TrainingData(Sequence):
             d = ts.copy()
             while True:
                 random.shuffle(d)
-                if not np.any(ts == d): break
-            for ab in zip(ts, d): self.match.append(ab)
+                if not np.any(ts == d):
+                    break
+            for ab in zip(ts, d):
+                self.match.append(ab)
 
         # Construct unmatched whale pairs from the LAP solution.
         for i, j in zip(x, y):
@@ -558,7 +478,8 @@ class TrainingData(Sequence):
         random.shuffle(self.match)
         random.shuffle(self.unmatch)
         # print(len(self.match), len(train), len(self.unmatch), len(train))
-        assert len(self.match) == len(train) and len(self.unmatch) == len(train)
+        assert len(self.match) == len(train) and len(
+            self.unmatch) == len(train)
 
     def __len__(self):
         return (len(self.match) + len(self.unmatch) + self.batch_size - 1) // self.batch_size
@@ -570,9 +491,6 @@ data = TrainingData(score)
 (a, b), c = data[0]
 
 
-# In[20]:
-
-
 # A Keras generator to evaluate only the BRANCH MODEL
 class FeatureGen(Sequence):
     def __init__(self, data, batch_size=64, verbose=1):
@@ -580,16 +498,19 @@ class FeatureGen(Sequence):
         self.data = data
         self.batch_size = batch_size
         self.verbose = verbose
-        if self.verbose > 0: self.progress = tqdm(total=len(self), desc='Features')
+        if self.verbose > 0:
+            self.progress = tqdm(total=len(self), desc='Features')
 
     def __getitem__(self, index):
         start = self.batch_size * index
         size = min(len(self.data) - start, self.batch_size)
         a = np.zeros((size,) + img_shape, dtype=K.floatx())
-        for i in range(size): a[i, :, :, :] = read_for_validation(self.data[start + i])
+        for i in range(size):
+            a[i, :, :, :] = read_for_validation(self.data[start + i])
         if self.verbose > 0:
             self.progress.update()
-            if self.progress.n >= len(self): self.progress.close()
+            if self.progress.n >= len(self):
+                self.progress.close()
         return a
 
     def __len__(self):
@@ -621,7 +542,8 @@ class ScoreGen(Sequence):
         b = self.x[self.ix[start:end], :]
         if self.verbose > 0:
             self.progress.update()
-            if self.progress.n >= len(self): self.progress.close()
+            if self.progress.n >= len(self):
+                self.progress.close()
         return [a, b]
 
     def __len__(self):
@@ -666,9 +588,10 @@ def compute_score(verbose=1):
     """
     Compute the score matrix by scoring every pictures from the training set against every other picture O(n^2).
     """
-    features = branch_model.predict_generator(FeatureGen(train, verbose=verbose), max_queue_size=12, workers=6,
+    features = branch_model.predict_generator(FeatureGen(train, verbose=verbose), max_queue_size=12, workers=12,
                                               verbose=0)
-    score = head_model.predict_generator(ScoreGen(features, verbose=verbose), max_queue_size=12, workers=6, verbose=0)
+    score = head_model.predict_generator(
+        ScoreGen(features, verbose=verbose), max_queue_size=12, workers=12, verbose=0)
     score = score_reshape(score, features)
     return features, score
 
@@ -689,21 +612,26 @@ def make_steps(step, ampl):
     for w, hs in w2hs.items():
         for h in hs:
             if h in train_set:
-                if w not in w2ts: w2ts[w] = []
-                if h not in w2ts[w]: w2ts[w].append(h)
-    for w, ts in w2ts.items(): w2ts[w] = np.array(ts)
+                if w not in w2ts:
+                    w2ts[w] = []
+                if h not in w2ts[w]:
+                    w2ts[w].append(h)
+    for w, ts in w2ts.items():
+        w2ts[w] = np.array(ts)
 
-    # Map training picture hash value to index in 'train' array    
+    # Map training picture hash value to index in 'train' array
     t2i = {}
-    for i, t in enumerate(train): t2i[t] = i
+    for i, t in enumerate(train):
+        t2i[t] = i
 
     # Compute the match score for each picture pair
     features, score = compute_score()
 
     # Train the model for 'step' epochs
     history = model.fit_generator(
-        TrainingData(score + ampl * np.random.random_sample(size=score.shape), steps=step, batch_size=16),
-        initial_epoch=steps, epochs=steps + step, max_queue_size=12, workers=6,  verbose=1).history
+        TrainingData(score + ampl * np.random.random_sample(size=score.shape),
+                     steps=step, batch_size=16),
+        initial_epoch=steps, epochs=steps + step, max_queue_size=12, workers=12,  verbose=1).history
     steps += step
 
     # Collect history data
@@ -714,61 +642,48 @@ def make_steps(step, ampl):
     histories.append(history)
 
 
-# In[22]:
-
-
 histories = []
 steps = 0
 
-# if isfile('../piotte/mpiotte-standard.model'):
-#     tmp = keras.models.load_model('../piotte/mpiotte-standard.model')
-#     model.set_weights(tmp.get_weights())
-# else:
-#     # epoch -> 10
-#     make_steps(10, 1000)
-#     ampl = 100.0
-#     for _ in tqdm(range(2)):
-#         print('noise ampl.  = ', ampl)
-#         make_steps(5, ampl)
-#         ampl = max(1.0, 100 ** -0.1 * ampl)
-#     model.save('standard1.model')
-#     # epoch -> 150
-#     for _ in tqdm(range(18)): make_steps(5, 1.0)
-#     model.save('standard2.model')
-#     # epoch -> 200
-#     set_lr(model, 16e-5)
-#     for _ in tqdm(range(10)): make_steps(5, 0.5)
-#     model.save('standard3.model')
-# # epoch -> 240
-# set_lr(model, 4e-5)
-# for _ in tqdm(range(8)): make_steps(5, 0.25)
-# model.save('standard4.model')
-# # epoch -> 250
-# set_lr(model, 1e-5)
-# for _ in range(2): make_steps(5, 0.25)
-# model.save('standard5.model')
-# epoch -> 300
-
-
-tmp = keras.models.load_model('standard5.model')
+tmp = keras.models.load_model('../model/ep150.model')
 model.set_weights(tmp.get_weights())
-# weights = model.get_weights()
-# model, branch_model, head_model = build_model(64e-5, 0.0002)
-# model.set_weights(weights)
-for _ in range(10): make_steps(5, 1.0)
-model.save('standard6.model')
+# epoch -> 200
+set_lr(model, 16e-5)
+for _ in range(10):
+    make_steps(5, 0.5)
+model.save('ep200.model')
+# epoch -> 240
+set_lr(model, 4e-5)
+for _ in range(8):
+    make_steps(5, 0.25)
+model.save('ep240.model')
+# epoch -> 250
+set_lr(model, 1e-5)
+for _ in range(2):
+    make_steps(5, 0.25)
+model.save('ep250.model')
+# epoch -> 300
+weights = model.get_weights()
+model, branch_model, head_model = build_model(64e-5, 0.0002)
+model.set_weights(weights)
+for _ in range(10):
+    make_steps(5, 1.0)
+model.save('ep300.model')
 # epoch -> 350
 set_lr(model, 16e-5)
-for _ in range(10): make_steps(5, 0.5)
-model.save('standard7.model')
+for _ in range(10):
+    make_steps(5, 0.5)
+model.save('ep350.model')
 # epoch -> 390
 set_lr(model, 4e-5)
-for _ in range(8): make_steps(5, 0.25)
-model.save('standard8.model')
+for _ in range(8):
+    make_steps(5, 0.25)
+model.save('ep390.model')
 # epoch -> 400
 set_lr(model, 1e-5)
-for _ in range(2): make_steps(5, 0.25)
-model.save('standard9.model')
+for _ in range(2):
+    make_steps(5, 0.25)
+model.save('ep400.model')
 
 
 def prepare_submission(threshold, filename):
@@ -792,7 +707,8 @@ def prepare_submission(threshold, filename):
                     pos[len(t)] += 1
                     s.add(new_whale)
                     t.append(new_whale)
-                    if len(t) == 5: break;
+                    if len(t) == 5:
+                        break
                 for w in h2ws[h]:
                     assert w != new_whale
                     if w not in s:
@@ -802,15 +718,15 @@ def prepare_submission(threshold, filename):
                             vhigh += 1
                         s.add(w)
                         t.append(w)
-                        if len(t) == 5: break;
-                if len(t) == 5: break;
-            if new_whale not in s: pos[5] += 1
+                        if len(t) == 5:
+                            break
+                if len(t) == 5:
+                    break
+            if new_whale not in s:
+                pos[5] += 1
             assert len(t) == 5 and len(s) == 5
             f.write(p + ',' + ' '.join(t[:5]) + '\n')
     return vtop, vhigh, pos
-
-
-# In[ ]:
 
 
 # Find elements from training sets not 'new_whale'
@@ -819,28 +735,27 @@ h2ws = {}
 for p, w in tagged.items():
     if w != new_whale:  # Use only identified whales
         h = p2h[p]
-        if h not in h2ws: h2ws[h] = []
-        if w not in h2ws[h]: h2ws[h].append(w)
+        if h not in h2ws:
+            h2ws[h] = []
+        if w not in h2ws[h]:
+            h2ws[h].append(w)
 known = sorted(list(h2ws.keys()))
 
 # Dictionary of picture indices
 h2i = {}
-for i, h in enumerate(known): h2i[h] = i
+for i, h in enumerate(known):
+    h2i[h] = i
 
 # Evaluate the model.
-fknown = branch_model.predict_generator(FeatureGen(known), max_queue_size=20, workers=5, verbose=0)
-fsubmit = branch_model.predict_generator(FeatureGen(submit), max_queue_size=20, workers=5, verbose=0)
-score = head_model.predict_generator(ScoreGen(fknown, fsubmit), max_queue_size=20, workers=5, verbose=0)
+fknown = branch_model.predict_generator(FeatureGen(
+    known), max_queue_size=20, workers=12, verbose=0)
+fsubmit = branch_model.predict_generator(FeatureGen(
+    submit), max_queue_size=20, workers=12, verbose=0)
+score = head_model.predict_generator(
+    ScoreGen(fknown, fsubmit), max_queue_size=20, workers=12, verbose=0)
 score = score_reshape(score, fknown, fsubmit)
 
 # Generate the subsmission file.
 prepare_submission(0.99, 'submission.csv')
 toc = time.time()
 print("Submission time: ", (toc - tic) / 60.)
-
-
-# In[ ]:
-
-
-
-
