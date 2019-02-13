@@ -31,8 +31,8 @@ from imgaug import augmenters as iaa
 
 TRAIN_DF = './metadata/oversampled_train_and_val.csv'
 SUB_Df = './sample_submission.csv'
-TRAIN = './train/'
-TEST = './test/'
+TRAIN = '/media/asilla/data102/hana/whale_pure/train/'
+TEST = '/media/asilla/data102/hana/whale_pure/test/'
 P2H = './metadata/p2h.pickle'
 P2SIZE = './metadata/p2size.pickle'
 BB_DF = "./metadata/bounding_boxes.csv"
@@ -645,45 +645,45 @@ def make_steps(step, ampl):
 histories = []
 steps = 0
 
-tmp = keras.models.load_model('../model/ep150.model')
+tmp = keras.models.load_model('./model/ep150.model')
 model.set_weights(tmp.get_weights())
 # epoch -> 200
 set_lr(model, 16e-5)
 for _ in range(10):
     make_steps(5, 0.5)
-model.save('ep200.model')
+model.save('./model/ep200.model')
 # epoch -> 240
 set_lr(model, 4e-5)
 for _ in range(8):
     make_steps(5, 0.25)
-model.save('ep240.model')
+model.save('./model/ep240.model')
 # epoch -> 250
 set_lr(model, 1e-5)
 for _ in range(2):
     make_steps(5, 0.25)
-model.save('ep250.model')
+model.save('./model/ep250.model')
 # epoch -> 300
 weights = model.get_weights()
 model, branch_model, head_model = build_model(64e-5, 0.0002)
 model.set_weights(weights)
 for _ in range(10):
     make_steps(5, 1.0)
-model.save('ep300.model')
+model.save('./model/ep300.model')
 # epoch -> 350
 set_lr(model, 16e-5)
 for _ in range(10):
     make_steps(5, 0.5)
-model.save('ep350.model')
+model.save('./model/ep350.model')
 # epoch -> 390
 set_lr(model, 4e-5)
 for _ in range(8):
     make_steps(5, 0.25)
-model.save('ep390.model')
+model.save('./model/ep390.model')
 # epoch -> 400
 set_lr(model, 1e-5)
 for _ in range(2):
     make_steps(5, 0.25)
-model.save('ep400.model')
+model.save('./model/ep400.model')
 
 
 def prepare_submission(threshold, filename):
