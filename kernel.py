@@ -12,8 +12,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from imagehash import phash
+from imgaug import augmenters as iaa
 from keras import backend as K
 from keras import regularizers
+from keras.callbacks import TensorBoard
 from keras.engine.topology import Input
 from keras.layers import (Activation, Add, BatchNormalization, Concatenate,
                           Conv2D, Dense, Flatten, GlobalMaxPooling2D, Lambda,
@@ -26,8 +28,6 @@ from lap import lapjv
 from pandas import read_csv
 from PIL import Image as pil_image
 from tqdm import tqdm
-
-from imgaug import augmenters as iaa
 
 TRAIN_DF = './metadata/oversampled_train_and_val.csv'
 SUB_Df = './sample_submission.csv'
@@ -628,10 +628,12 @@ def make_steps(step, ampl):
     features, score = compute_score()
 
     # Train the model for 'step' epochs
+    tensorboard = TensorBoard(log_dir="logs/from_{}_to_{}_at_{}".format(steps, steps + step, time.time()),
+                              batch_size=16, write_images=True)
     history = model.fit_generator(
         TrainingData(score + ampl * np.random.random_sample(size=score.shape),
                      steps=step, batch_size=16),
-        initial_epoch=steps, epochs=steps + step, max_queue_size=12, workers=12,  verbose=1).history
+        initial_epoch=steps, epochs=steps + step, max_queue_size=12, workers=12,  verbose=1, callbacks=[tensorboard]).history
     steps += step
 
     # Collect history data
