@@ -31,8 +31,8 @@ from imgaug import augmenters as iaa
 
 TRAIN_DF = './metadata/oversampled_train_and_val.csv'
 SUB_Df = './sample_submission.csv'
-TRAIN = './train/'
-TEST = './test/'
+TRAIN = '/media/asilla/data102/hana/whale_pure/train/'
+TEST = '/media/asilla/data102/hana/whale_pure/test/'
 P2H = './metadata/p2h.pickle'
 P2SIZE = './metadata/p2size.pickle'
 BB_DF = "./metadata/bounding_boxes.csv"
@@ -645,7 +645,7 @@ def make_steps(step, ampl):
 histories = []
 steps = 0
 
-tmp = keras.models.load_model('./model/ep150.model')
+tmp = keras.models.load_model('./model/ep200.model')
 model.set_weights(tmp.get_weights())
 
 
