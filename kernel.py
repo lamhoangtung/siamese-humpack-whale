@@ -36,6 +36,9 @@ TEST = '/media/asilla/data102/hana/whale_pure/test/'
 P2H = './metadata/p2h.pickle'
 P2SIZE = './metadata/p2size.pickle'
 BB_DF = "./metadata/bounding_boxes.csv"
+
+train_batch_size = 16
+
 tagged = dict([(p, w) for _, p, w in read_csv(TRAIN_DF).to_records()])
 submit = [p for _, p, _ in read_csv(SUB_Df).to_records()]
 join = list(tagged.keys()) + submit
@@ -629,10 +632,10 @@ def make_steps(step, ampl):
 
     # Train the model for 'step' epochs
     tensorboard = TensorBoard(log_dir="logs/from_{}_to_{}_at_{}".format(steps, steps + step, time.time()),
-                              batch_size=16, write_images=True)
+                              batch_size=train_batch_size, write_images=True)
     history = model.fit_generator(
         TrainingData(score + ampl * np.random.random_sample(size=score.shape),
-                     steps=step, batch_size=16),
+                     steps=step, batch_size=train_batch_size),
         initial_epoch=steps, epochs=steps + step, max_queue_size=12, workers=12,  verbose=1, callbacks=[tensorboard]).history
     steps += step
 
