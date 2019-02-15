@@ -647,13 +647,13 @@ def make_steps(step, ampl):
 histories = []
 steps = 0
 
-tmp = keras.models.load_model('./model/ep150.model')
+tmp = keras.models.load_model('./model/ep200.model')
 model.set_weights(tmp.get_weights())
-# epoch -> 200
-set_lr(model, 16e-5)
-for _ in range(10):
-    make_steps(5, 0.5)
-model.save('./model/ep200.model')
+# # epoch -> 200
+# set_lr(model, 16e-5)
+# for _ in range(10):
+#     make_steps(5, 0.5)
+# model.save('./model/ep200.model')
 # epoch -> 240
 set_lr(model, 4e-5)
 for _ in range(8):
