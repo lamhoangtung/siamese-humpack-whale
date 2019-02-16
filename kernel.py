@@ -213,18 +213,18 @@ def read_cropped_image(p, augment):
     row = p2bb.loc[p]
     x0, y0, x1, y1 = row['x0'], row['y0'], row['x1'], row['y1']
     img = read_raw_image(p)
-    img = img[y0:y1, x0:x1]
+    # img = img[y0:y1, x0:x1]
     img = cv2.resize(img, img_shape[:-1])
     # Affine transform
-    if augment:
-        augmentor = iaa.Affine(
-            scale=(1.0, 1.2),
-            shear=(-30, 30),
-            order=1,
-            mode='constant',
-            cval=np.average(img)
-        )
-        img = augmentor.augment_image(img)
+    # if augment:
+    #     augmentor = iaa.Affine(
+    #         scale=(1.0, 1.2),
+    #         shear=(-30, 30),
+    #         order=1,
+    #         mode='constant',
+    #         cval=np.average(img)
+    #     )
+    #     img = augmentor.augment_image(img)
 
     return img
 
@@ -651,10 +651,10 @@ if not train_from_scratch:
 #     make_steps(5, 0.5)
 # model.save('./model/ep200.model')
 # epoch -> 240
-set_lr(model, 4e-5)
-for _ in range(8):
-    make_steps(5, 0.25)
-model.save('./model/ep240.model')
+# set_lr(model, 4e-5)
+# for _ in range(8):
+#     make_steps(5, 0.25)
+# model.save('./model/ep240.model')
 # epoch -> 250
 set_lr(model, 1e-5)
 for _ in range(2):
