@@ -205,6 +205,15 @@ def build_transform(rotation, shear, height_zoom, width_zoom, height_shift, widt
     return np.dot(np.dot(rotation_matrix, shear_matrix), np.dot(zoom_matrix, shift_matrix))
 
 
+wrong_bb_list = ['89a1a7fae.jpg',
+                 '5192f0bcf.jpg',
+                 '23d2dff49.jpg',
+                 '9498e6bcf.jpg',
+                 'b8f420e50.jpg',
+                 '6a62fab94.jpg',
+                 '2d742ff03.jpg']
+
+
 def read_cropped_image(p, augment):
     """
     @param p : the name of the picture to read
@@ -212,9 +221,10 @@ def read_cropped_image(p, augment):
     @return a numpy array with the transformed image
     """
     # If an image id was given, convert to filename
+
     if p in h2p:
         p = h2p[p]
-    # size_x, size_y = p2size[p]
+    size_x, size_y = p2size[p]
 
     if '_' in p:
         # No need to augment
@@ -235,7 +245,8 @@ def read_cropped_image(p, augment):
         if x1 > size_x: x1 = size_x
         if y1 < 0: y1+=add_amount_y
         img = read_raw_image(p)
-        img = img[y0:y1, x0:x1]
+        if p not in wrong_bb_list:
+            img = img[int(y0):int(y1), int(x0):int(x1)]
         img = cv2.resize(img, img_shape[:-1])
         if augment:
             augmentor = iaa.Affine(
