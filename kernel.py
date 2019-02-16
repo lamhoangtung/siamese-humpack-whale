@@ -117,6 +117,13 @@ else:
 #     with open(P2H, 'wb') as f:
 #         pickle.dump(p2h, f)
 # For each image id, determine the list of pictures
+
+with open(P2H, 'wb') as f:
+    pickle.dump(p2h, f)
+
+with open(P2SIZE, 'wb') as f:
+    pickle.dump(p2size, f)
+
 h2ps = {}
 for p, h in p2h.items():
     if h not in h2ps:
@@ -205,18 +212,22 @@ def read_cropped_image(p, augment):
     @return a numpy array with the transformed image
     """
     # If an image id was given, convert to filename
-    # if p in h2p:
-    #     p = h2p[p]
+    if p in h2p:
+        p = h2p[p]
     # size_x, size_y = p2size[p]
 
+    if '_' in p:
+        img = read_raw_image(p)
+        img = cv2.resize(img, img_shape[:-1])
+    else:
     # # Determine the region of the original image we want to capture based on the bounding box.
-    # row = p2bb.loc[p]
-    # x0, y0, x1, y1 = row['x0'], row['y0'], row['x1'], row['y1']
-    img = read_raw_image(p)
-    # img = img[y0:y1, x0:x1]
-    img = cv2.resize(img, img_shape[:-1])
+        row = p2bb.loc[p]
+        x0, y0, x1, y1 = row['x0'], row['y0'], row['x1'], row['y1']
+        img = read_raw_image(p)
+        img = img[y0:y1, x0:x1]
+        img = cv2.resize(img, img_shape[:-1])
     # Affine transform
-    # if augment:
+        if augment:
     #     augmentor = iaa.Affine(
     #         scale=(1.0, 1.2),
     #         shear=(-30, 30),
