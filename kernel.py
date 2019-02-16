@@ -29,15 +29,7 @@ from pandas import read_csv
 from PIL import Image as pil_image
 from tqdm import tqdm
 
-TRAIN_DF = './metadata/oversampled_train_and_val.csv'
-SUB_Df = './sample_submission.csv'
-TRAIN = '/media/asilla/data102/hana/whale_pure/train/'
-TEST = '/media/asilla/data102/hana/whale_pure/test/'
-P2H = './metadata/p2h.pickle'
-P2SIZE = './metadata/p2size.pickle'
-BB_DF = "./metadata/bounding_boxes.csv"
-
-train_batch_size = 16
+from config import *
 
 tagged = dict([(p, w) for _, p, w in read_csv(TRAIN_DF).to_records()])
 submit = [p for _, p, _ in read_csv(SUB_Df).to_records()]
@@ -182,7 +174,6 @@ sys.stderr = open('/dev/null' if platform.system()
 
 sys.stderr = old_stderr
 
-img_shape = (384, 384, 3)  # The image shape used by the model
 anisotropy = 2.15  # The horizontal compression ratio
 # The margin added around the bounding box to compensate for bounding box inaccuracy
 crop_margin = 0.05
@@ -650,8 +641,10 @@ def make_steps(step, ampl):
 histories = []
 steps = 0
 
-tmp = keras.models.load_model('./model/ep200.model')
-model.set_weights(tmp.get_weights())
+if not train_from_scratch:
+    tmp = keras.models.load_model(last_weight)
+    model.set_weights(tmp.get_weights())
+
 # # epoch -> 200
 # set_lr(model, 16e-5)
 # for _ in range(10):
