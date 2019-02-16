@@ -28,14 +28,8 @@ from PIL import Image as pil_image
 from tqdm import tqdm
 
 from imgaug import augmenters as iaa
+from config import *
 
-TRAIN_DF = './metadata/oversampled_train_and_val.csv'
-SUB_Df = './sample_submission.csv'
-TRAIN = '/media/asilla/data102/hana/whale_pure/train/'
-TEST = '/media/asilla/data102/hana/whale_pure/test/'
-P2H = './metadata/p2h.pickle'
-P2SIZE = './metadata/p2size.pickle'
-BB_DF = "./metadata/bounding_boxes.csv"
 tagged = dict([(p, w) for _, p, w in read_csv(TRAIN_DF).to_records()])
 submit = [p for _, p, _ in read_csv(SUB_Df).to_records()]
 join = list(tagged.keys()) + submit
@@ -645,7 +639,7 @@ def make_steps(step, ampl):
 histories = []
 steps = 0
 
-tmp = keras.models.load_model('./model/ep200.model')
+tmp = keras.models.load_model(test_weight)
 model.set_weights(tmp.get_weights())
 
 
