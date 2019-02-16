@@ -7,11 +7,11 @@ P2H = './metadata/_p2h.pickle'
 P2SIZE = './metadata/_p2size.pickle'
 BB_DF = "./metadata/bounding_boxes.csv"
 
-train_batch_size = 32
+train_batch_size = 16
 train_from_scratch = False
 last_weight = './model/ep240.model'
 test_weight = './model/ep250.model'
 img_shape = (384, 384, 3)  # The image shape used by the model
 anisotropy = 2.15  # The horizontal compression ratio
 # The margin added around the bounding box to compensate for bounding box inaccuracy
-crop_margin = 0.05
+crop_margin = 0.075

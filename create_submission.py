@@ -113,8 +113,8 @@ else:
         if h in h2h:
             h = h2h[h]
         p2h[p] = h
-#     with open(P2H, 'wb') as f:
-#         pickle.dump(p2h, f)
+# with open(P2H, 'wb') as f:
+#     pickle.dump(p2h, f)
 # For each image id, determine the list of pictures
 h2ps = {}
 for p, h in p2h.items():
