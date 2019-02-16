@@ -212,6 +212,18 @@ def read_cropped_image(p, augment):
     # Determine the region of the original image we want to capture based on the bounding box.
     row = p2bb.loc[p]
     x0, y0, x1, y1 = row['x0'], row['y0'], row['x1'], row['y1']
+    add_amount_x = int(size_x * crop_margin / 2)
+    add_amount_y = int(size_y * crop_margin / 2)
+    x0 -= add_amount_x
+    y0 += add_amount_y
+    x1 += add_amount_x
+    y1 -= add_amount_y
+    if x0 < 0:  x0 = 0
+    if y0 > size_y: y0 = size_y
+    if x1 > size_x: x1 = size_x
+    if y1 < 0: y1+=add_amount_y
+    # import pdb; pdb.set_trace()
+
     img = read_raw_image(p)
     img = img[y0:y1, x0:x1]
     img = cv2.resize(img, img_shape[:-1])
