@@ -24,4 +24,5 @@ wrong_bb_list = ['89a1a7fae.jpg',
                  'b8f420e50.jpg',
                  '6a62fab94.jpg',
                  '2d742ff03.jpg',
-                 '20a08372e.jpg']
+                 '20a08372e.jpg',
+                 'd841c519b.jpg']
