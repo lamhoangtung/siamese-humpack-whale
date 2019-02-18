@@ -204,16 +204,6 @@ def build_transform(rotation, shear, height_zoom, width_zoom, height_shift, widt
         [[1, 0, -height_shift], [0, 1, -width_shift], [0, 0, 1]])
     return np.dot(np.dot(rotation_matrix, shear_matrix), np.dot(zoom_matrix, shift_matrix))
 
-
-wrong_bb_list = ['89a1a7fae.jpg',
-                 '5192f0bcf.jpg',
-                 '23d2dff49.jpg',
-                 '9498e6bcf.jpg',
-                 'b8f420e50.jpg',
-                 '6a62fab94.jpg',
-                 '2d742ff03.jpg']
-
-
 def read_cropped_image(p, augment):
     """
     @param p : the name of the picture to read

@@ -225,7 +225,8 @@ def read_cropped_image(p, augment):
     # import pdb; pdb.set_trace()
 
     img = read_raw_image(p)
-    img = img[y0:y1, x0:x1]
+    if p not in wrong_bb_list:
+        img = img[y0:y1, x0:x1]
     img = cv2.resize(img, img_shape[:-1])
     # Affine transform
     if augment:

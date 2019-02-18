@@ -14,4 +14,13 @@ test_weight = './model/ep250.model'
 img_shape = (384, 384, 3)  # The image shape used by the model
 anisotropy = 2.15  # The horizontal compression ratio
 # The margin added around the bounding box to compensate for bounding box inaccuracy
-crop_margin = 0.075
+crop_margin = 0.065
+
+
+wrong_bb_list = ['89a1a7fae.jpg',
+                 '5192f0bcf.jpg',
+                 '23d2dff49.jpg',
+                 '9498e6bcf.jpg',
+                 'b8f420e50.jpg',
+                 '6a62fab94.jpg',
+                 '2d742ff03.jpg']
