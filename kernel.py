@@ -683,23 +683,27 @@ for _ in range(2):
     make_steps(5, 0.25)
 model.save('./model/ep250.model')
 # epoch -> 300
-weights = model.get_weights()
-model, branch_model, head_model = build_model(64e-5, 0.0002)
-model.set_weights(weights)
+# weights = model.get_weights()
+# model, branch_model, head_model = build_model(64e-5, 0.0002)
+# model.set_weights(weights)
+set_lr(model, 1e-5)
 for _ in range(10):
     make_steps(5, 1.0)
 model.save('./model/ep300.model')
 # epoch -> 350
-set_lr(model, 16e-5)
+# set_lr(model, 16e-5)
+set_lr(model, 1e-5)
 for _ in range(10):
     make_steps(5, 0.5)
 model.save('./model/ep350.model')
 # epoch -> 390
-set_lr(model, 4e-5)
+# set_lr(model, 4e-5)
+set_lr(model, 1e-5)
 for _ in range(8):
     make_steps(5, 0.25)
 model.save('./model/ep390.model')
 # epoch -> 400
+# set_lr(model, 1e-5)
 set_lr(model, 1e-5)
 for _ in range(2):
     make_steps(5, 0.25)
